@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>건강한 나침반</title>
+  <style>
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      background-color: #f7f9fc;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+    header {
+      background-color: #4cb7a5;
+      color: white;
+      padding: 20px;
+      font-size: 1.8em;
+      font-weight: bold;
+    }
+    .search-section {
+      margin: 20px auto;
+      padding: 10px;
+    }
+    input, select, button {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      background-color: #4cb7a5;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #3a9888;
+    }
+    #map {
+      width: 90%;
+      height: 400px;
+      margin: 20px auto;
+      border-radius: 10px;
+    }
+    #result {
+      width: 80%;
+      margin: 20px auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+  <header>🩺 건강한 나침반</header>
+
+  <section class="search-section">
+    <h3>당신에게 맞는 복지혜택을 찾아보세요</h3>
+    <select id="group">
+      <option value="">대상 선택</option>
+      <option value="elderly">노인</option>
+      <option value="lowIncome">기초수급자</option>
+      <option value="disabled">장애인</option>
+    </select>
+    <input type="text" id="keyword" placeholder="예: 건강검진, 병원비 지원 등">
+    <button onclick="searchBenefit()">검색</button>
+  </section>
+
+  <div id="result"></div>
+  <div id="map"></div>
+
+  <!-- ✅ 카카오맵 API 불러오기 -->
+  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=cd4f1d49b9dbbeb55accd0737ad65b38&libraries=services"></script>
+
+  <script>
+    // -------------------------------
+    // 🗺️ 지도 초기화
+    // -------------------------------
+    const mapContainer = document.getElementById('map');
+    const mapOption = {
+      center: new kakao.maps.LatLng(37.5665, 126.9780), // 기본 중심 (서울시청)
+      level: 5
+    };
+    const map = new kakao.maps.Map(mapContainer, mapOption);
+
+    // -------------------------------
+    // 📍 내 위치 기반으로 지도 중심 이동 + 병원 표시
+    // -------------------------------
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(position) {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const locPosition = new kakao.maps.LatLng(lat, lon);
+
+        // 지도 중심 이동
+        map.setCenter(locPosition);
+
+        // 내 위치 마커 표시
+        const myMarker = new kakao.maps.Marker({
+          position: locPosition
+        });
+        myMarker.setMap(map);
+
+        // ✅ 병원 검색 및 표시
+        const ps = new kakao.maps.services.Places();
+        ps.keywordSearch('병원', function (data, status) {
+          if (status === kakao.maps.services.Status.OK) {
+            for (let i = 0; i < data.length; i++) {
+              displayMarker(data[i]);
+            }
+          }
+        }, {
+          location: locPosition, // 내 위치 기준
+          radius: 3000           // 반경 3km
+        });
+
+        // ✅ 병원 마커 표시 함수
+        function displayMarker(place) {
+          const marker = new kakao.maps.Marker({
+            map: map,
+            position: new kakao.maps.LatLng(place.y, place.x)
+          });
+
+          const infowindow = new kakao.maps.InfoWindow({
+            content: `<div style="padding:8px; font-size:13px;">
+                        <b>${place.place_name}</b><br>
+                        ${place.road_address_name || place.address_name}<br>
+                        ${place.phone ? `☎ ${place.phone}` : ''}
+                      </div>`
+          });
+
+          kakao.maps.event.addListener(marker, 'click', function() {
+            infowindow.open(map, marker);
+          });
+
+          // 병원 목록을 지도 아래에 추가 (선택 기능)
+          const resultDiv = document.getElementById('result');
+          resultDiv.innerHTML += `<p>🏥 ${place.place_name} - ${place.road_address_name || place.address_name}</p>`;
+        }
+
+      }, function() {
+        alert("위치 정보를 불러올 수 없습니다 😥");
+      });
+    } else {
+      alert("이 브라우저는 위치 정보를 지원하지 않습니다.");
+    }
+
+    // -------------------------------
+    // 💡 복지혜택 검색 기능
+    // -------------------------------
+    function searchBenefit() {
+      const group = document.getElementById('group').value;
+      const keyword = document.getElementById('keyword').value;
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = ""; // 기존 내용 초기화
+
+      let message = "";
+
+      if (group === "elderly") {
+        message += "<h3>노인 복지 혜택</h3>";
+        message += "<ul><li>무료 독감 예방접종</li><li>건강검진 지원</li><li>노인복지관 무료 운동 프로그램</li></ul>";
+      } else if (group === "lowIncome") {
+        message += "<h3>기초수급자 혜택</h3>";
+        message += "<ul><li>병원 진료비 90% 지원</li><li>의료급여 1종/2종 혜택</li><li>보건소 무료 진료</li></ul>";
+      } else if (group === "disabled") {
+        message += "<h3>장애인 복지 혜택</h3>";
+        message += "<ul><li>재활치료비 지원</li><li>장애인 전용 병원비 감면</li></ul>";
+      } else {
+        message += "<p>대상과 키워드를 선택해주세요.</p>";
+      }
+
+      if (keyword) {
+        message += `<p>검색 키워드: <strong>${keyword}</strong></p>`;
+      }
+
+      resultDiv.innerHTML = message;
+    }
+  </script>
+
+</body>
+</html>
